@@ -2,6 +2,7 @@ import type { TreePayload } from '../types'
 import type { NewHirePosition } from '../hireposition'
 import { withPendingOrder, type PendingOrder } from './pendingorder'
 import { canonPiles, pruneRetiredView, viewPiles, viewHidden, canvasTargets } from './canvaslayout'
+import { pruneCollapsedView } from './viewmod'
 import { USER, DRAFT, INBOX, NODE_W, NODE_H, flatten, withDraftTree, withPendingMoves, treeParents } from './shared'
 import type { Pt, ChartLayout, DraftState, PendingMoves } from './shared'
 
@@ -17,6 +18,8 @@ export type MoveGhostOptions = {
   inboxPxc: number
   draftCredits?: number
   bunchProjects?: boolean
+  /** view mod: collapsed teams, pruned as the canvas prunes them */
+  collapsed?: ReadonlySet<string>
 }
 
 /** Project moveShown's final layout, then return the moved node's offset
@@ -37,9 +40,10 @@ export function moveGhostOffset(tree: TreePayload, moves: PendingMoves,
   for (const entry of orders.values())
     if (!entry.block.includes(id)) projected = withPendingOrder(projected, entry)
   const full = canonPiles(withDraftTree(projected, options.draft, options.newHirePosition))
-  const root = pruneRetiredView(full, options.hideRetired, options.shownRetired).root
+  const collapsed = options.collapsed ?? new Set<string>()
+  const root = pruneCollapsedView(pruneRetiredView(full, options.hideRetired, options.shownRetired).root, collapsed).root
   const map = flatten(full, options.seats)
-  const piles = viewPiles(root, options.pileFront, options.crowdPiles, options.hideRetired, options.shownRetired)
+  const piles = viewPiles(root, options.pileFront, options.crowdPiles, options.hideRetired, options.shownRetired, collapsed)
   const hidden = viewHidden(root, piles)
   const targets = canvasTargets(root, map, hidden, options.chartLayout, tree, options.inboxPxc, options.draftCredits, options.bunchProjects, options.hideRetired)
   const moved = targets.get(id), superior = targets.get(drop)

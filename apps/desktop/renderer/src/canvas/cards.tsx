@@ -1,5 +1,6 @@
 import { CardFace } from './cardface'
 import { RetiredBadge } from './retiredbadge'
+import { CollapseChip, ProjectStripe, useViewMod, viewModEntries } from './viewmod'
 import { grantLimits, hireGrantMax } from './creditgrant'
 import { QueuedAccountBadge, QueuedModelBadge, QueuedFastBadge, SessionZeroBadge } from './nextturn'
 import { DndBadge } from './dnd'
@@ -1649,9 +1650,10 @@ export function NodeSquare({ node, pos, lod, focused: deskOpen, dragging, isDrop
   // this agent's desk is already popped out decides which of the two entries
   // the builder offers, and a card must not hold a store subscription for it
   const deskNow = useDeskActionsNow(slug)
+  const viewMod = useViewMod()
   const menuEntries = (): MenuEntry[] => {
     const desk = deskNow(node)
-    return agentMenuEntries(node, {
+    return [...agentMenuEntries(node, {
       onOpenDesk: onRecenter,
       onInbox: () => onInbox(true),
       onTeam: onTeam ? () => onTeam(true) : undefined,
@@ -1688,7 +1690,8 @@ export function NodeSquare({ node, pos, lod, focused: deskOpen, dragging, isDrop
       onContinueOn: (account) => void continueFrozenOnAccount(slug, node.id, account, toast),
     }, { pinned, piled: !!pile, detached: desk.detached,
       quickChatTier: readQuickChat(slug, quickChatDefaults).tier,
-      claudeHire, codexHire, antigravityHire, openrouterHire, langserverHire, museHire })
+      claudeHire, codexHire, antigravityHire, openrouterHire, langserverHire, museHire }),
+      ...viewModEntries(viewMod, node)]
   }
   const trackEdge = (e: React.PointerEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect()
@@ -1895,6 +1898,7 @@ export function NodeSquare({ node, pos, lod, focused: deskOpen, dragging, isDrop
       {!focused && lod === 'mini' && (
         <FarZoomStateIcon node={node} />
       )}
+      {!focused && <ProjectStripe id={node.id} />}
       {!focused && lod !== 'mini' && <CardFace>
       {/* the whole world-scaled head disappears at focus — the desk renders its
           own compact chrome inside the counter-scaled panel (a world-scaled name
@@ -2109,6 +2113,7 @@ export function NodeSquare({ node, pos, lod, focused: deskOpen, dragging, isDrop
             : tierEffortLevels(slug, node.tier)} />
           <DndBadge active={node.dnd} nextTurn={node.dnd_next_turn} />
           <SessionZeroBadge node={node} />
+          <CollapseChip id={node.id} />
           {onRetired && <RetiredBadge parent={node.id} count={retiredCount} onOpen={onRetired} />}
         </div>
       )}

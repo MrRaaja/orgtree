@@ -55,6 +55,7 @@ import { AboutSection, StartupWindowsSetting, useAppVersion } from '../shell/gen
 import { DefaultsForm } from '../shell/defaults'
 import { setQuickChatPosition, useQuickChatPosition, type QuickChatPosition } from '../quickchat'
 import { EngineDebugToggle } from './enginedebug'
+import { setAutoProjectLook, useAutoProjectLook } from './viewmod'
 import { EpicModeSwitch } from '../epic/EpicSwitch'
 
 // small local copies of the usage-modal label helpers (App.tsx owns the
@@ -345,6 +346,12 @@ export function ProjectBunchRearrangeSetting() {
   return <SetToggle label="Rearrange projects in a bunch" checked={on}
     onChange={setProjectBunchRearrangeOn}
     hint="Drag within a bunch to change project order; off keeps ordinary subtree dragging" />
+}
+export function ProjectAutoLookSetting() {
+  const on = useAutoProjectLook()
+  return <SetToggle label="Color projects automatically" checked={on}
+    onChange={setAutoProjectLook}
+    hint="Give each project its own color, and an icon matched to its name; right-click a project for Color & icon" />
 }
 
 function CrowdStackToggle() {
@@ -952,7 +959,7 @@ export function AccountsPanel({ toast, close, initialTab, target }: {
     <SettingsTabPanel id="display" idBase="app-settings" active={tab === 'display'}>
       <ThemeSetting />
       <CanvasBackgroundSetting />
-      <SetGroup title="Desk"><ChartLayoutSetting /><NewHirePositionSetting /><HireAutoFocusSetting /><ProjectBunchSetting /><ProjectBunchRearrangeSetting /><DeskTextSize /><CrowdStackToggle /><HideRetiredToggle /><AgentShortcutsToggle /><ModalOverlapSettings /><PinSnapToggle /><JumpFoldToggle /><CanvasAnchorSettings /></SetGroup>
+      <SetGroup title="Desk"><ChartLayoutSetting /><NewHirePositionSetting /><HireAutoFocusSetting /><ProjectBunchSetting /><ProjectBunchRearrangeSetting /><ProjectAutoLookSetting /><DeskTextSize /><CrowdStackToggle /><HideRetiredToggle /><AgentShortcutsToggle /><ModalOverlapSettings /><PinSnapToggle /><JumpFoldToggle /><CanvasAnchorSettings /></SetGroup>
       <SetGroup title="Quick chat"><QuickChatPositionSetting /></SetGroup>
       <SetGroup title="Typing">
         <SetRow label="Enter key" hint={composerKeyHint(enterKey ?? runtime?.enter_key_behavior ?? 'send')}>

@@ -1,5 +1,6 @@
 import { CardFace } from './cardface'
 import { RetiredBadge } from './retiredbadge'
+import { CollapseChip, LookIcon, useViewMod, viewModEntries } from './viewmod'
 // canvas/projectcard.tsx — the canvas card of a PROJECT NODE
 // (docs/rust-engine/PROJECT-NODES.md; user 2026-10-16): a node that stands
 // for one project and is not an agent. It runs no turns and holds no
@@ -109,6 +110,9 @@ export function ProjectSquare({ node, pos, lod, focused, pinnedFocus, pinned, on
   onOpenTemporary, onPopout, onDismiss, retiredCount = 0, onRetired, onDragStart, onDragMove, onDragEnd, onDragCancel }: ProjectSquareProps) {
   const menu = useContextMenu()
   const surfaceRoutes = useAgentSurfaceRoutes()
+  const viewMod = useViewMod()
+  const look = viewMod?.look(node.id)
+  const mark = look?.icon ? <LookIcon icon={look.icon} /> : <FolderIcon fontSize="inherit" />
   // the mailbox hover button obeys "Show agent card shortcuts", like an
   // agent card's hover row (user 2026-10-17 19:37Z)
   const showShortcuts = useAgentShortcuts()
@@ -172,7 +176,9 @@ export function ProjectSquare({ node, pos, lod, focused, pinnedFocus, pinned, on
     zIndex: dragging ? 8 : undefined,
   }
   if (zoom > 0) Object.assign(style, { '--invzf': Math.max(1 / Z_MAX, 1 / zoom).toFixed(3) })
-  const menuEntries = () => projectMenuEntries(node, {
+  // view mod: the project's colour recolours the whole card through --accent
+  if (look?.color) Object.assign(style, { '--accent': look.color, '--org-accent': look.color })
+  const menuEntries = () => [...projectMenuEntries(node, {
     onInbox: () => onInbox(true),
     onTeam: onTeam ? () => onTeam(true) : undefined,
     onDocket: onDocket ? () => onDocket(true) : undefined,
@@ -195,7 +201,7 @@ export function ProjectSquare({ node, pos, lod, focused, pinnedFocus, pinned, on
     onOpenDesk: onFocus,
     onPin,
     onShowPin,
-  }, { ...hire, pinned, quickChatTier: readQuickChat(slug, tree?.quick_chat).tier })
+  }, { ...hire, pinned, quickChatTier: readQuickChat(slug, tree?.quick_chat).tier }), ...viewModEntries(viewMod, node)]
   return (
     <div ref={cardRef} data-copy-agent-name={node.id}
       {...agentTooltipProps(deskOpen ? undefined : node.id)} className={cls.join(' ')} style={style}
@@ -217,13 +223,13 @@ export function ProjectSquare({ node, pos, lod, focused, pinnedFocus, pinned, on
       }}
       onContextMenu={(e) => menu.open(e, menuEntries)}>
       {lod === 'mini' ? (
-        <span className="project-mini" {...agentTooltipProps(node.id)}><FolderIcon fontSize="inherit" /></span>
+        <span className="project-mini" {...agentTooltipProps(node.id)}>{mark}</span>
       ) : (
         <CardFace fit={!deskOpen && !pinnedFocus}>
           <div className="sq-head project-head">
             <div className="sq-title">
               <span className="project-mark" {...agentTooltipProps(node.id, true)}>
-                <FolderIcon fontSize="inherit" />
+                {mark}
               </span>
               <CardName text={node.id} hovered={nameHover && !deskOpen && !pinnedFocus} {...agentTooltipProps(node.id)} />
             </div>
@@ -240,6 +246,7 @@ export function ProjectSquare({ node, pos, lod, focused, pinnedFocus, pinned, on
             {listenerBadges.map((c) => <span key={c.key} className={'project-listeners-badge' + (c.bright ? ' bright' : '')}
               title={c.title}>{c.text}</span>)}
             {queue && <span className={'project-queue-badge' + (queue.bright ? ' bright' : '')} title={queue.title}>{queue.text}</span>}
+            {!deskOpen && <CollapseChip id={node.id} />}
             {!deskOpen && onRetired && <RetiredBadge parent={node.id} count={retiredCount} onOpen={onRetired} />}
             </div>
           </div>

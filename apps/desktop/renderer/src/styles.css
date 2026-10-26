@@ -9963,3 +9963,41 @@ button.node-link.node-link:focus-visible {
 .mention-navigation-highlight { background: color-mix(in srgb, var(--accent, #e9b949) 18%, transparent); outline: 2px solid var(--accent, #e9b949); outline-offset: 3px; border-radius: 4px; }
 .mention-landing { margin: 12px; padding: 10px; }
 .mention-landing .md > :first-child { margin-top: 6px; }
+
+/* ---------------------------------------------------------------- view mod
+   (MrRaaja fork, canvas/viewmod.tsx): project colour + icon, collapsible
+   teams. Theme-neutral: colours mix with the active panel and ink. */
+.vm-icon { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round; }
+.project-mark svg.vm-icon, .project-mini svg.vm-icon { fill: none; }
+.vm-icon-img { width: 1em; height: 1em; border-radius: 3px; object-fit: cover; display: block; }
+.badge.vm-collapse { cursor: pointer; font-family: var(--mono); }
+.badge.vm-collapse.closed { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--input)); }
+.sq .badge.vm-collapse.open { opacity: 0; transition: opacity .12s; }
+.sq:hover .badge.vm-collapse.open, .sq:focus-within .badge.vm-collapse.open { opacity: .75; }
+.vm-stripe { position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 0 2px 2px 0;
+  pointer-events: none; opacity: .9; }
+.vm-backdrop { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, .35); }
+.vm-dialog { width: 372px; max-width: calc(100vw - 32px); background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); border-top: 3px solid var(--vm-color); border-radius: 10px; padding: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .35); }
+.vm-dialog-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.vm-dialog-head strong { flex: 1; color: var(--ink-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vm-preview { font-size: 22px; color: var(--vm-color); display: inline-flex; }
+.vm-x { background: none; border: none; color: var(--dim); cursor: pointer; font-size: 14px; }
+.vm-label { font-size: 11px; color: var(--dim); margin: 8px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+.vm-swatches, .vm-icons { display: flex; flex-wrap: wrap; gap: 6px; }
+.vm-swatch { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0;
+  position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.vm-swatch.on { border-color: var(--ink-strong); box-shadow: 0 0 0 2px var(--panel) inset; }
+.vm-custom { background: var(--input); color: var(--dim); font-size: 14px; border: 1px dashed var(--line); }
+.vm-custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.vm-iconbtn { width: 34px; height: 34px; border-radius: 7px; border: 1px solid var(--line); background: var(--input);
+  color: var(--vm-color); font-size: 20px; display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; padding: 0; }
+.vm-iconbtn.on { border-color: var(--vm-color); background: color-mix(in srgb, var(--vm-color) 18%, var(--input)); }
+.vm-upload { color: var(--dim); font-size: 16px; }
+.vm-error { color: var(--dead-letter, #e5534b); font-size: 12px; margin-top: 6px; }
+.vm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }

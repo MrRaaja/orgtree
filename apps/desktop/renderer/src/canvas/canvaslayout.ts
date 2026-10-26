@@ -52,7 +52,8 @@ export function canonPiles(n: CanvasNode): CanvasNode {
     return { ...n, children: [...before, ...arch, ...after] }
   }
 
-export function viewPiles(vroot: CanvasNode, pileFront: Record<string, string>, crowdPiles: boolean, hideRetired: boolean, shownRetired: ReadonlySet<string>) {   // pile key ("<parent>|a"/"<parent>|c") → pile
+export function viewPiles(vroot: CanvasNode, pileFront: Record<string, string>, crowdPiles: boolean, hideRetired: boolean, shownRetired: ReadonlySet<string>,
+  collapsed: ReadonlySet<string> = new Set()) {   // pile key ("<parent>|a"/"<parent>|c") → pile
     const out = new Map<string, Pile>()
     const walk = (n: CanvasNode) => {
       const kids = n.children ?? []
@@ -88,7 +89,8 @@ export function viewPiles(vroot: CanvasNode, pileFront: Record<string, string>, 
       // separate behaviour and is deliberately untouched.
       const active = kids.filter((c) => c.state !== 'archived' && c.id !== DRAFT)
       if (crowdPiles && active.length > 8) {
-        const leaves = active.filter((c) => !(c.children ?? []).length)
+        // a collapsed team (view mod) has no visible children but is no leaf
+        const leaves = active.filter((c) => !(c.children ?? []).length && !collapsed.has(c.id))
         if (leaves.length >= 2) {
           const key = n.id + '|c'
           const want = pileFront[key]

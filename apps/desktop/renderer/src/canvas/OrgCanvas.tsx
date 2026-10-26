@@ -1,5 +1,6 @@
 import { orgNavigationTooltip } from '../shell/orgnavigationbindings'
 import { canonPiles, pruneRetiredView, viewPiles, viewHidden, canvasTargets } from './canvaslayout'
+import { ViewModContext, ProjectLookDialog, collapseToMasters, pruneCollapsedView, setCollapsedIds, useCollapsedIds, useViewModState, viewModEntries } from './viewmod'
 import { hireAutoFocusOn } from '../hirefocus'
 import { projectBunches, projectBunchLink, projectBunchInsertion, type ProjectBunch } from './projectbunch'
 import { projectBunchesOn, useProjectBunches, projectBunchRearrangeOn, useProjectBunchRearrange } from './projectbunchprefs'
@@ -862,12 +863,22 @@ export function OrgCanvas({ tree, op, slug, toast, mailEvt, onInbox, onDocket, o
   useEffect(() => { setShownRetired(new Set<string>()) }, [slug])
   const prunedView = useMemo(() => pruneRetiredView(vrootFull, hideRetired, shownRetired),
     [vrootFull, hideRetired, shownRetired])
-  const vroot = prunedView.root
+  // view mod: collapsed teams, a second display prune after hide-retired's
+  const collapsedIds = useCollapsedIds(slug)
+  const collapsedSet = useMemo(() => new Set(collapsedIds), [collapsedIds])
+  const collapsedView = useMemo(() => pruneCollapsedView(prunedView.root, collapsedSet),
+    [prunedView, collapsedSet])
+  const vroot = collapsedView.root
+  const collapsedRef = useRef(collapsedView.prunedIds)
+  useEffect(() => { collapsedRef.current = collapsedView.prunedIds }, [collapsedView])
+  const collapsedIdsRef = useRef(collapsedIds)
+  collapsedIdsRef.current = collapsedIds
   const prunedRef = useRef(prunedView.prunedIds)
   useEffect(() => { prunedRef.current = prunedView.prunedIds }, [prunedView])
   // the retired-list token's open menu: the parent id whose list is showing
   const [retiredOpen, setRetiredOpen] = useState<string | null>(null)
   const map = useMemo(() => flatten(vrootFull, seats), [vrootFull])   // eslint-disable-line
+  const viewMod = useViewModState(slug, map, collapsedView.hiddenCount)
   const retiredCounts = useMemo(() => {
     const counts = new Map([...prunedView.retiredByParent].map(([id, rows]) => [id, rows.length]))
     if (hideRetired) for (const [id, node] of map) {
@@ -1204,8 +1215,8 @@ export function OrgCanvas({ tree, op, slug, toast, mailEvt, onInbox, onDocket, o
   // Read as state (not by calling crowdPilesOn() inline) so flipping the switch
   // re-piles the canvas under live agents instead of waiting for a reload.
   const crowdPiles = useCrowdPiles()
-  const piles = useMemo(() => viewPiles(vroot, pileFront, crowdPiles, hideRetired, shownRetired),
-    [vroot, pileFront, crowdPiles, hideRetired, shownRetired])
+  const piles = useMemo(() => viewPiles(vroot, pileFront, crowdPiles, hideRetired, shownRetired, collapsedSet),
+    [vroot, pileFront, crowdPiles, hideRetired, shownRetired, collapsedSet])
   const pileByFront = useMemo(() => {
     const out = new Map<string, Pile>()
     for (const p of piles.values()) out.set(p.front, p)
@@ -1484,9 +1495,11 @@ export function OrgCanvas({ tree, op, slug, toast, mailEvt, onInbox, onDocket, o
   const ghostOffset = useMemo(() => draggingId && !draggingInBunch ? moveGhostOffset(
     pendingBunch ? withProjectBunchRotation(tree, pendingBunch) : tree, pendingTargets,
     pendingOrders, draggingId, dropId, { draft, seats, pileFront, crowdPiles,
-      hideRetired, shownRetired, chartLayout, inboxPxc, draftCredits, bunchProjects, newHirePosition }) : undefined,
+      hideRetired, shownRetired, chartLayout, inboxPxc, draftCredits, bunchProjects, newHirePosition,
+      collapsed: collapsedSet }) : undefined,
   [draggingId, draggingInBunch, dropId, tree, pendingTargets, pendingOrders, draft, seats, pileFront,
-    crowdPiles, hideRetired, shownRetired, chartLayout, inboxPxc, draftCredits, bunchProjects, pendingBunch, newHirePosition])
+    crowdPiles, hideRetired, shownRetired, chartLayout, inboxPxc, draftCredits, bunchProjects, pendingBunch, newHirePosition,
+    collapsedSet])
   const ghostParent = dropId ? springs.current.get(dropId) ?? target.get(dropId) : undefined
   const moveGhost = ghostOffset && ghostParent
     ? { x: ghostParent.x + ghostOffset.x, y: ghostParent.y + ghostOffset.y } : undefined
@@ -2358,6 +2371,17 @@ export function OrgCanvas({ tree, op, slug, toast, mailEvt, onInbox, onDocket, o
         && id !== EXTERN && !id.startsWith('dog:')) {
       if (view.missing.includes(id)) toast([`${id} is not in this organization`])
       else setPendingJump({ id, z, onCanvas })
+      return
+    }
+    // view mod: a node inside a COLLAPSED team is revealed by any jump to it:
+    // every collapsed ancestor opens, then the glide lands after the re-layout
+    if (collapsedRef.current.has(id)) {
+      const open = new Set<string>()
+      let cur = mapRef.current.get(id)?.parent ?? undefined
+      while (cur) { open.add(cur); cur = mapRef.current.get(cur)?.parent ?? undefined }
+      setCollapsedIds(slug, collapsedIdsRef.current.filter((c) => !open.has(c)))
+      requestAnimationFrame(() => requestAnimationFrame(() =>
+        centerRef.current?.(id, z, onCanvas)))
       return
     }
     // a HIDDEN retiree (hide-retired setting) is revealed by ANY jump to it —
@@ -3478,6 +3502,9 @@ export function OrgCanvas({ tree, op, slug, toast, mailEvt, onInbox, onDocket, o
       { label: can ? `Focus last desk (${lastDesk})` : 'Focus last desk',
         title: orgNavigationTooltip('Focus last desk', 'lastDesk'),
         onSelect: () => { if (can) centerOn(lastDesk!) }, disabled: !can },
+      { label: 'Collapse teams to masters', title: 'show projects and their top agents; fold every team below',
+        onSelect: () => collapseToMasters(slug, vrootFull.children ?? []) },
+      { label: 'Expand all teams', disabled: !collapsedIds.length, onSelect: () => setCollapsedIds(slug, []) },
     ]
   }
   useLayoutEffect(() => {
@@ -3651,7 +3678,7 @@ export function OrgCanvas({ tree, op, slug, toast, mailEvt, onInbox, onDocket, o
     deskNow: ReturnType<typeof useDeskActionsNow>): MenuEntry[] => {
     // read at menu-open time, never subscribed to (deskhosts.tsx)
     const desk = deskNow(n)
-    return agentMenuEntries(n, {
+    return [...agentMenuEntries(n, {
       onOpenDesk: go,
       onInbox: () => openInbox(n.id, { ensureOpen: true }),
       onTeam: () => openTeam(n.id, { ensureOpen: true }),
@@ -3707,7 +3734,7 @@ export function OrgCanvas({ tree, op, slug, toast, mailEvt, onInbox, onDocket, o
       // front) a pile front, and a pile front hires nowhere: its edges are the
       // stack. Same answer the card gives, decided before the walk.
       piled: pileByFront.has(n.id) || hidden.has(n.id),
-    })
+    }), ...viewModEntries(viewMod.mod, n)]   // the row and the card stay one menu
   }
 
   // edge JUMP CARDS (user spec 2026-08-17): at desk zoom the focused agent's
@@ -4363,6 +4390,9 @@ export function OrgCanvas({ tree, op, slug, toast, mailEvt, onInbox, onDocket, o
   })
 
   return (
+    <ViewModContext.Provider value={viewMod.mod}>
+    {viewMod.editing && <ProjectLookDialog slug={slug} id={viewMod.editing}
+      current={viewMod.mod.look(viewMod.editing)} onClose={viewMod.closeEditor} />}
     <CardNameRevealProvider><AgentNavProvider><ObjectNavProvider>
     <OrgKillswitchContext.Provider value={!!tree.killswitch}>
     <ForegroundViewContext.Provider value={tree.foreground}>
@@ -5305,6 +5335,7 @@ export function OrgCanvas({ tree, op, slug, toast, mailEvt, onInbox, onDocket, o
     </ForegroundViewContext.Provider>
     </OrgKillswitchContext.Provider>
     </ObjectNavProvider></AgentNavProvider></CardNameRevealProvider>
+    </ViewModContext.Provider>
   )
 }
 
