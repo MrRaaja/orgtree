@@ -192,7 +192,7 @@ function team(o) {
   const notes = [
     `These agents are the Claude Code agents of the project at ${o.project}.`,
     o.context.length ? `Before your first task, read ${o.context.map(f => path.join(o.project, f)).join(' and ')}: `
-      + 'those are the project rules every agent follows, and they stay current there.' : '',
+      + 'they describe the project and its rules, and they stay current there.' : '',
     rootName !== o.root ? `In this team's charters, "${o.root}" means ${rootName}.` : '',
     o.notes ? fs.readFileSync(o.notes, 'utf8').trim() : '',
   ].filter(Boolean).join('\n\n');
@@ -252,8 +252,12 @@ async function into(o) {
   if (!org.dirs.some(d => o.grant.toLowerCase().startsWith(d.path.toLowerCase()))) {
     throw new Error(`${o.into} holds no folder containing ${o.grant}: add it in Organization settings first`);
   }
-  const taken = new Set();
-  (function names(ns) { for (const n of ns) { taken.add(n.id.toLowerCase()); names(n.children ?? []); } })(org.roots);
+  const nodes = [];
+  (function flat(ns) { for (const n of ns) { nodes.push(n); flat(n.children ?? []); } })(org.roots);
+  // an empty project of the same name (live or archived) is reused rather than refused
+  const project = nodes.find(n => n.tier === 'project' && n.id.toLowerCase() === o.name.toLowerCase()
+    && !(n.children ?? []).some(c => c.state === 'live'));
+  const taken = new Set(nodes.filter(n => n !== project).map(n => n.id.toLowerCase()));
   const clash = [o.name, ...(function all(s) { return [s.name, ...(s.reports ?? []).flatMap(all)]; })(root)]
     .filter(n => taken.has(n.toLowerCase()));
   if (clash.length) throw new Error(`already in ${o.into}: ${clash.join(', ')} (use --root-name or retire them first)`);
@@ -265,12 +269,18 @@ async function into(o) {
     if (s.add_dirs) step.add_dirs = s.add_dirs;
     steps.push(step);
     (s.reports ?? []).forEach(r => hire(r, s.name));
-  })(root, o.name);
+  })(root, project?.id ?? o.name);
 
-  await api('POST', `/api/orgs/${o.into}/ops`, { op: 'create_project', name: o.name, parent: 'user', description: notes });
-  console.log(`created project ${o.name} in ${o.into}`);
+  if (project) {
+    if (project.state !== 'live') await api('POST', `/api/orgs/${o.into}/ops`, { op: 'rehire', node: project.id });
+    await api('POST', `/api/orgs/${o.into}/ops`, { op: 'configure_project', node: project.id, settings: { description: notes } });
+    console.log(`reused project ${project.id} in ${o.into}${project.state !== 'live' ? ' (restored)' : ''}`);
+  } else {
+    await api('POST', `/api/orgs/${o.into}/ops`, { op: 'create_project', name: o.name, parent: 'user', description: notes });
+    console.log(`created project ${o.name} in ${o.into}`);
+  }
   const out = await api('POST', `/api/orgs/${o.into}/gesture`, { steps, label: `Import ${o.name} agents` });
-  console.log(`hired ${out.results?.length ?? steps.length} agents under ${o.name}`);
+  console.log(`hired ${out.results?.length ?? steps.length} agents under ${project?.id ?? o.name}`);
 }
 
 const o = args(process.argv.slice(2));
