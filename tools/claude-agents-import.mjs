@@ -4,7 +4,10 @@
 // organization can hire the whole hierarchy in one step.
 //
 //   node tools/claude-agents-import.mjs --project D:\proj [--id proj] [--name "Proj"]
-//        [--root master] [--context CLAUDE.md,WORKSPACE.md] [--out <dir>] [--dry-run] [--check]
+//        [--root master] [--context CLAUDE.md,WORKSPACE.md] [--grant <folder>] [--out <dir>] [--dry-run] [--check]
+//
+// --grant is the folder the org (and the read-only agents) hold when it is wider
+// than the project, e.g. a parent that also holds the repo's git worktrees.
 //
 // Hierarchy: the root (--root, default "master") is the agent the user talks to.
 // A manager's reports are the agents named in its `tools: Agent(a, b)` list,
@@ -33,6 +36,7 @@ function args(argv) {
   }
   if (!out.project) throw new Error('--project <folder> is required');
   out.project = path.resolve(out.project);
+  out.grant = out.grant ? path.resolve(out.grant) : out.project;
   out.id ??= path.basename(out.project).toLowerCase().replace(/[^a-z0-9._-]+/g, '-');
   out.name ??= path.basename(out.project);
   out.context = (out.context ?? 'CLAUDE.md,CLAUDE.local.md').split(',').map(s => s.trim()).filter(Boolean);
@@ -169,7 +173,7 @@ function build(o) {
     const peers = a.delegates.filter(d => agents.has(d) && !reports.includes(d));
     const s = { name: n, tier: tierOf(n), charter: { text: charter(a, o, reports, peers) }, spare: 0, tools: a.tools };
     // read-only roles keep the project folder read-only, not just their edit tools off
-    if (!a.tools.edit) s.add_dirs = [{ path: o.project, mode: 'ro' }];
+    if (!a.tools.edit) s.add_dirs = [{ path: o.grant, mode: 'ro' }];
     if (visibility) s.org_visibility = visibility;
     if (reports.length) s.reports = reports.map(slot);
     return s;
@@ -205,7 +209,7 @@ async function check(t, o) {
   const res = await fetch(`http://127.0.0.1:${port}/api/templates/resolve`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'X-Orgtree-Desktop-Token': token },
-    body: JSON.stringify({ id: t.id, name: t.name, dirs: [o.project] }),
+    body: JSON.stringify({ id: t.id, name: t.name, dirs: [o.grant] }),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`resolve refused (${res.status}): ${JSON.stringify(body)}`);
