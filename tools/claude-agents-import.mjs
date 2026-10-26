@@ -4,10 +4,17 @@
 // organization can hire the whole hierarchy in one step.
 //
 //   node tools/claude-agents-import.mjs --project D:\proj [--id proj] [--name "Proj"]
-//        [--root master] [--context CLAUDE.md,WORKSPACE.md] [--grant <folder>] [--out <dir>] [--dry-run] [--check]
+//        [--root master] [--root-name <name>] [--context CLAUDE.md,WORKSPACE.md] [--grant <folder>]
+//        [--notes <file.md>] [--into <org-slug>] [--out <dir>] [--dry-run] [--check]
 //
-// --grant is the folder the org (and the read-only agents) hold when it is wider
-// than the project, e.g. a parent that also holds the repo's git worktrees.
+// --grant is the folder the team holds when it is wider than the project, e.g. a
+// parent that also holds the repo's git worktrees. --notes appends a Markdown file
+// to the team's standing notes. --root-name renames the root in Orgtree (names are
+// unique per org, so two imported teams cannot both have a "master").
+//
+// --into adds the team to an existing org instead of writing a template: it
+// creates a project named --name whose Summary carries the notes, then hires the
+// whole team under it in one undoable gesture.
 //
 // Hierarchy: the root (--root, default "master") is the agent the user talks to.
 // A manager's reports are the agents named in its `tools: Agent(a, b)` list,
@@ -157,40 +164,51 @@ function rootAgent(agents, o) {
   };
 }
 
-function build(o) {
+// The team as nested template slots (the root first), plus its standing notes.
+// Delegates that are not an agent's own reports are its siblings or cousins; Orgtree
+// lets siblings mail each other, so no wider visibility is granted.
+function team(o) {
   o.context = o.context.filter(f => fs.existsSync(path.join(o.project, f)));
   const agents = load(o.project);
   if (!agents.has(o.root)) agents.set(o.root, rootAgent(agents, o));
   const parent = tree(agents, o.root);
   const kids = n => [...agents.keys()].filter(k => parent.get(k) === n);
-  const crossLinked = n => agents.get(n).delegates.some(d => parent.get(d) !== n);
-  const visibility = [...agents.keys()].some(crossLinked) ? 'full' : null;
   const tierOf = n => agents.get(n).tier ?? (parent.get(n) ? tierOf(parent.get(n)) : 'opus');
+  const rootName = o['root-name'] ?? o.root;
 
   const slot = n => {
     const a = agents.get(n);
     const reports = kids(n);
     const peers = a.delegates.filter(d => agents.has(d) && !reports.includes(d));
-    const s = { name: n, tier: tierOf(n), charter: { text: charter(a, o, reports, peers) }, spare: 0, tools: a.tools };
-    // read-only roles keep the project folder read-only, not just their edit tools off
+    const s = { name: n === o.root ? rootName : n, tier: tierOf(n), charter: { text: charter(a, o, reports, peers) }, spare: 0, tools: a.tools };
+    // the root holds the team's folder (an org may hold other teams' folders too); reports
+    // inherit it, and read-only roles keep it read-only, not just their edit tools off
+    if (n === o.root) s.add_dirs = [{ path: o.grant, mode: 'rw' }];
     if (!a.tools.edit) s.add_dirs = [{ path: o.grant, mode: 'ro' }];
-    if (visibility) s.org_visibility = visibility;
     if (reports.length) s.reports = reports.map(slot);
     return s;
   };
 
+  const notes = [
+    `These agents are the Claude Code agents of the project at ${o.project}.`,
+    o.context.length ? `Before your first task, read ${o.context.map(f => path.join(o.project, f)).join(' and ')}: `
+      + 'those are the project rules every agent follows, and they stay current there.' : '',
+    rootName !== o.root ? `In this team's charters, "${o.root}" means ${rootName}.` : '',
+    o.notes ? fs.readFileSync(o.notes, 'utf8').trim() : '',
+  ].filter(Boolean).join('\n\n');
+  return { root: slot(o.root), notes, size: agents.size };
+}
+
+function build(o) {
+  const t = team(o);
   return {
     id: o.id,
     name: o.name,
-    description: `${agents.size} agents imported from ${path.join(o.project, '.claude', 'agents')}.`,
+    description: `${t.size} agents imported from ${path.join(o.project, '.claude', 'agents')}.`,
     version: 1,
-    org_md: [`# ${o.name}`, '',
-      `This organization runs the Claude Code agents of the project at ${o.project}.`,
-      o.context.length ? `Before your first task, read ${o.context.map(f => path.join(o.project, f)).join(' and ')}: `
-        + 'those are the project rules every agent follows, and they stay current there.' : '',
-    ].filter(Boolean).join('\n'),
-    quick_chat: { superior: o.root, tier: 'opus' },
-    agents: [slot(o.root)],
+    org_md: `# ${o.name}\n\n${t.notes}`,
+    quick_chat: { superior: t.root.name, tier: 'opus' },
+    agents: [t.root],
   };
 }
 
@@ -198,28 +216,69 @@ function print(slots, depth = 0) {
   for (const s of slots) {
     const t = s.tools;
     const flags = ['bash', 'edit', 'web'].filter(k => t[k]).join(',') || 'read-only';
-    console.log(`${'  '.repeat(depth)}${s.name} [${s.tier}] ${flags}${s.add_dirs ? ' (folder ro)' : ''} - ${s.charter.text.length} chars`);
+    const dirs = s.add_dirs ? ` ${s.add_dirs.map(d => `${d.path} ${d.mode}`).join(', ')}` : '';
+    console.log(`${'  '.repeat(depth)}${s.name} [${s.tier}] ${flags}${dirs} - ${s.charter.text.length} chars`);
     if (s.reports) print(s.reports, depth + 1);
   }
 }
 
-async function check(t, o) {
+// the running desktop engine's API, authenticated the way its own UI is
+function engine() {
   const data = process.env.ORGTREE_V2_DATA ?? path.join(process.env.APPDATA ?? '', 'Orgtree v2', 'data');
   const { port, token } = JSON.parse(fs.readFileSync(path.join(data, 'engine-attach.json'), 'utf8'));
-  const res = await fetch(`http://127.0.0.1:${port}/api/templates/resolve`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'X-Orgtree-Desktop-Token': token },
-    body: JSON.stringify({ id: t.id, name: t.name, dirs: [o.grant] }),
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`resolve refused (${res.status}): ${JSON.stringify(body)}`);
-  console.log(JSON.stringify(body, null, 2));
+  return async (method, p, body) => {
+    const res = await fetch(`http://127.0.0.1:${port}${p}`, {
+      method,
+      headers: { 'content-type': 'application/json', 'X-Orgtree-Desktop-Token': token },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(`${method} ${p} refused (${res.status}): ${JSON.stringify(out)}`);
+    return out;
+  };
+}
+
+async function check(t, o) {
+  console.log(JSON.stringify(await engine()('POST', '/api/templates/resolve', { id: t.id, name: t.name, dirs: [o.grant] }), null, 2));
+}
+
+// Adds the team to an existing org: a project holding the notes, then every hire in
+// one gesture (one transaction, one undo entry). Grants are computed as a template's
+// are: each manager's grant covers its reports' seats and grants.
+async function into(o) {
+  const api = engine();
+  const { root, notes } = team(o);
+  const org = await api('GET', `/api/orgs/${o.into}`);
+  if (!org.dirs.some(d => o.grant.toLowerCase().startsWith(d.path.toLowerCase()))) {
+    throw new Error(`${o.into} holds no folder containing ${o.grant}: add it in Organization settings first`);
+  }
+  const taken = new Set();
+  (function names(ns) { for (const n of ns) { taken.add(n.id.toLowerCase()); names(n.children ?? []); } })(org.roots);
+  const clash = [o.name, ...(function all(s) { return [s.name, ...(s.reports ?? []).flatMap(all)]; })(root)]
+    .filter(n => taken.has(n.toLowerCase()));
+  if (clash.length) throw new Error(`already in ${o.into}: ${clash.join(', ')} (use --root-name or retire them first)`);
+
+  const grant = s => s.spare + (s.reports ?? []).reduce((sum, r) => sum + org.tiers[r.tier] + grant(r), 0);
+  const steps = [];
+  (function hire(s, parent) {
+    const step = { op: 'hire', name: s.name, tier: s.tier, grant: grant(s), parent, charter: s.charter.text, tools: s.tools };
+    if (s.add_dirs) step.add_dirs = s.add_dirs;
+    steps.push(step);
+    (s.reports ?? []).forEach(r => hire(r, s.name));
+  })(root, o.name);
+
+  await api('POST', `/api/orgs/${o.into}/ops`, { op: 'create_project', name: o.name, parent: 'user', description: notes });
+  console.log(`created project ${o.name} in ${o.into}`);
+  const out = await api('POST', `/api/orgs/${o.into}/gesture`, { steps, label: `Import ${o.name} agents` });
+  console.log(`hired ${out.results?.length ?? steps.length} agents under ${o.name}`);
 }
 
 const o = args(process.argv.slice(2));
 const t = build(o);
 print(t.agents);
-if (!o.dry_run) {
+if (o.into) {
+  if (!o.dry_run) await into(o);
+} else if (!o.dry_run) {
   fs.mkdirSync(o.out, { recursive: true });
   const file = path.join(o.out, `${t.id}.json`);
   fs.writeFileSync(file, JSON.stringify(t, null, 2) + '\n');
