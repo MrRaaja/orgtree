@@ -84,6 +84,14 @@ Generic operating practices live once at the widest shared level that needs them
 
 For the roles and workflow behind the bundled layouts, see `orgtree-dev-team` (orgtree-workflows › collaboration-patterns).
 
+## Importing Claude Code subagents
+
+`tools/claude-agents-import.mjs` turns a project's Claude Code subagents (`.claude/agents/*.md`) into an Orgtree team. The orchestrator (`--root`, default `master`; one is written from the roster when the project has none) becomes the top agent; each manager's `tools: Agent(a, b)` list becomes its reports, breadth-first, so an agent several managers use is hired once under the shallowest one and the others mail it. The subagent's description and body become its charter, with a note that delegation is by Orgtree mail; `model` maps to a tier, and `tools`/`disallowedTools` map to the shell, edit and web switches (subagents off). Roles without edit tools hold the project folder read-only.
+
+- Without `--into`, it writes a template to `~/.orgtree/templates/<id>.json` for **Create organization**; `--check` previews it against the running engine.
+- `--into <org>` adds the team to an existing organization instead: a project (`--name`) whose Summary carries the project's notes, then every hire in one undoable gesture. The organization must already hold the project's folder. `--root-name` renames the top agent so several imported teams can share an organization.
+- `--context` names the project files every agent should read first (default `CLAUDE.md,CLAUDE.local.md`, whichever exist); `--grant` gives the team a wider folder than the project; `--dry-run` prints the tree only.
+
 ## Deep layouts and portable choices
 
 Files retain nested version-1 agents/reports JSON. There is no node or level limit; only the 16 MiB file bound applies. Internally the engine owns a flat node list and uses iterative parsing, planning and export, so deep trees also clone and drop without recursive ownership. Other JSON parsers keep their normal limits. Older 4.4.1 readers keep their own restrictions: their validator allows four tree levels and their default parser accepts 63 tree levels, refusing 64. They cannot open a 5,000-level template. An unknown format version is refused with a clear version message.
