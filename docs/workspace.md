@@ -30,6 +30,10 @@ The list's **Active** filter means currently mid-turn, not merely reporting “w
 
 The full tree preserves deeply nested project chains. Bunching or folding changes the display, rather than cutting off the reporting chain or the agents below it. In a Team tab, the badge counts immediate physical children, including projects, while the list covers descendants.
 
+**Fold a team** to keep a large org readable: right-click an agent or project and choose **Collapse team**. Its card stays, with a **▸ N** chip counting what is hidden below; click the chip or choose **Expand team** to open it again (an open team shows **▾** on hover). **Collapse all teams below** folds every team under a card while keeping that card's own reports visible, and **Expand everything below** undoes it. Right-click empty canvas for **Collapse all teams**, which leaves projects and their top-level agents, and **Expand all teams**. Folding is a display choice saved per organization on this computer: hidden agents keep working, mail and desks reach them as usual, and any jump to a hidden agent opens its branch.
+
+**Tell projects apart** by colour: with **Color projects automatically** (App settings > Display, on by default) each project gets its own colour and an icon matched to its name, and the agents inside it carry a stripe in that colour. Right-click a project and choose **Color & icon…** to pick a colour, a built-in icon or an uploaded image; **Reset** returns to the automatic look.
+
 ## Move around
 
 Drag empty canvas space to pan, and use the wheel over the canvas to zoom. Middle-drag also pans when you begin over a card or desk. The wheel inside a scrollable desk or list scrolls that surface instead. Pinned windows keep their screen position while the canvas moves.

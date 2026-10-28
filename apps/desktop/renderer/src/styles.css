@@ -9963,3 +9963,41 @@ button.node-link.node-link:focus-visible {
 .mention-navigation-highlight { background: color-mix(in srgb, var(--accent, #e9b949) 18%, transparent); outline: 2px solid var(--accent, #e9b949); outline-offset: 3px; border-radius: 4px; }
 .mention-landing { margin: 12px; padding: 10px; }
 .mention-landing .md > :first-child { margin-top: 6px; }
+
+/* ---------------------------------------------------------- view options
+   (canvas/viewoptions.tsx): project colour + icon, collapsible
+   teams. Theme-neutral: colours mix with the active panel and ink. */
+.vo-icon { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round; }
+.project-mark svg.vo-icon, .project-mini svg.vo-icon { fill: none; }
+.vo-icon-img { width: 1em; height: 1em; border-radius: 3px; object-fit: cover; display: block; }
+.badge.vo-collapse { cursor: pointer; font-family: var(--mono); }
+.badge.vo-collapse.closed { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--input)); }
+.sq .badge.vo-collapse.open { opacity: 0; transition: opacity .12s; }
+.sq:hover .badge.vo-collapse.open, .sq:focus-within .badge.vo-collapse.open { opacity: .75; }
+.vo-stripe { position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 0 2px 2px 0;
+  pointer-events: none; opacity: .9; }
+.vo-backdrop { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, .35); }
+.vo-dialog { width: 372px; max-width: calc(100vw - 32px); background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); border-top: 3px solid var(--vo-color); border-radius: 10px; padding: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .35); }
+.vo-dialog-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.vo-dialog-head strong { flex: 1; color: var(--ink-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vo-preview { font-size: 22px; color: var(--vo-color); display: inline-flex; }
+.vo-x { background: none; border: none; color: var(--dim); cursor: pointer; font-size: 14px; }
+.vo-label { font-size: 11px; color: var(--dim); margin: 8px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+.vo-swatches, .vo-icons { display: flex; flex-wrap: wrap; gap: 6px; }
+.vo-swatch { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0;
+  position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.vo-swatch.on { border-color: var(--ink-strong); box-shadow: 0 0 0 2px var(--panel) inset; }
+.vo-custom { background: var(--input); color: var(--dim); font-size: 14px; border: 1px dashed var(--line); }
+.vo-custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.vo-iconbtn { width: 34px; height: 34px; border-radius: 7px; border: 1px solid var(--line); background: var(--input);
+  color: var(--vo-color); font-size: 20px; display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; padding: 0; }
+.vo-iconbtn.on { border-color: var(--vo-color); background: color-mix(in srgb, var(--vo-color) 18%, var(--input)); }
+.vo-upload { color: var(--dim); font-size: 16px; }
+.vo-error { color: var(--dead-letter, #e5534b); font-size: 12px; margin-top: 6px; }
+.vo-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
